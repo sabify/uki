@@ -4,7 +4,7 @@ Uki (pronounced `ookee`) is a fast, simple and cross-platform UDP packet forward
 
 Here are some of the features of Uki:
 
-- Fast and reliable: Uki is designed to be fast and reliable, even when forwarding large amounts of data.
+- Fast: Uki is designed to be fast.
 - Simple to use: Uki is easy to use, even for users with no experience with packet forwarding.
 - Secure: Uki can encrypt all packets to protect your data from prying eyes.
 - Cross-Platform: Uki can be run anywhere that Rust compiler supports.
