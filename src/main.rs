@@ -38,6 +38,8 @@ impl PoolAllocator<Vec<u8>> for ObjectPoolAllocator {
 fn main() {
     let cli = args::Cli::parse();
 
+    udpflow::set_timeout(std::time::Duration::from_secs(cli.timeout));
+
     if let Some(ref log_path) = cli.log_path {
         let log_file = std::fs::File::create(log_path)
             .unwrap_or_else(|_| panic!("could not create log file {}", log_path.to_string_lossy()));
@@ -112,12 +114,26 @@ async fn handle_new_peer(
 
     match cli.command {
         args::Commands::Client => {
-            handle_peer_connection(peer_addr, peer_sock, remote_sock, encryption, pool.clone())
-                .await;
+            handle_peer_connection(
+                peer_addr,
+                peer_sock,
+                remote_sock,
+                encryption,
+                cli.deadline,
+                pool.clone(),
+            )
+            .await;
         }
         args::Commands::Server => {
-            handle_peer_connection(peer_addr, remote_sock, peer_sock, encryption, pool.clone())
-                .await;
+            handle_peer_connection(
+                peer_addr,
+                remote_sock,
+                peer_sock,
+                encryption,
+                cli.deadline,
+                pool.clone(),
+            )
+            .await;
         }
     }
 }
@@ -127,6 +143,7 @@ async fn handle_peer_connection<T, U>(
     peer_sock: T,
     remote_sock: U,
     encryption: Option<Arc<Encryption>>,
+    deadline: Option<u64>,
     pool: Arc<opool::Pool<ObjectPoolAllocator, Vec<u8>>>,
 ) where
     T: AsyncRead + AsyncWrite + Unpin,
@@ -137,25 +154,34 @@ async fn handle_peer_connection<T, U>(
             stream::EncryptStream::new(peer_sock, encryption.clone(), stream::Mode::Encrypt);
         let remote_sock =
             stream::EncryptStream::new(remote_sock, encryption.clone(), stream::Mode::Decrypt);
-        relay(peer_addr, peer_sock, remote_sock, pool).await;
+        relay(peer_addr, peer_sock, remote_sock, deadline, pool).await;
         return;
     }
-    relay(peer_addr, peer_sock, remote_sock, pool).await;
+    relay(peer_addr, peer_sock, remote_sock, deadline, pool).await;
 }
 async fn relay<T, U>(
     peer_addr: SocketAddr,
     mut peer_sock: T,
     mut remote_sock: U,
+    deadline: Option<u64>,
     pool: Arc<opool::Pool<ObjectPoolAllocator, Vec<u8>>>,
 ) where
     T: AsyncRead + AsyncWrite + Unpin,
     U: AsyncRead + AsyncWrite + Unpin,
 {
-    if let Err(err) = crate::copy_bidirectional::copy_bidirectional(
-        &mut peer_sock,
-        &mut remote_sock,
-        pool.get().as_mut(),
-        pool.get().as_mut(),
+    let duration = match deadline {
+        Some(deadline) => std::time::Duration::from_secs(deadline),
+        None => std::time::Duration::from_secs(84600 * 365),
+    };
+
+    if let Err(err) = tokio::time::timeout(
+        duration,
+        crate::copy_bidirectional::copy_bidirectional(
+            &mut peer_sock,
+            &mut remote_sock,
+            pool.get().as_mut(),
+            pool.get().as_mut(),
+        ),
     )
     .await
     {

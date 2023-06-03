@@ -9,7 +9,7 @@ keywords = ["encryption", "udp", "network", "forward", "tunnel"]
 categories = ["network-programming"]
 readme = "README.md"
 description = """
-Uki (pronounced `ookee`) is a fast, simple and cross-platform UDP packet forwarder and encryptor.
+Uki is a fast, simple and cross-platform UDP packet forwarder and encryptor.
 """
 
 [dependencies]

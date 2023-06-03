@@ -13,6 +13,12 @@ pub struct Cli {
     /// Remote address. Both IPv4 and IPv6 is supported.
     pub remote: SocketAddr,
     #[arg(long)]
+    /// Enable deadline on open connections. An open connection will be forcibly closed after provided seconds.
+    pub deadline: Option<u64>,
+    #[arg(long, default_value_t = 20)]
+    /// Connections that fail or are idle for `timeout` seconds will be closed.
+    pub timeout: u64,
+    #[arg(long)]
     /// Enable encryption. Usage format: '<method>:<arg>', e.g. 'xor:mysecurekey'.
     /// This should be enabled on both server and client.
     /// Currently only XOR is supported.
