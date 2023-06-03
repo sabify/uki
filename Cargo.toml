@@ -1,0 +1,38 @@
+[package]
+name = "uki"
+version = "0.1.0"
+edition = "2021"
+authors = ["Saber Haj Rabiee"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/sabify/uki"
+keywords = ["encryption", "udp", "network", "packet", "forwarder", "tunnel"]
+categories = ["network-programming"]
+readme = "README.md"
+description = """
+Uki (pronounced `ookee`) is a fast, simple and cross-platform UDP packet forwarder and encryptor.
+"""
+
+[dependencies]
+udpflow = { version = "0.1", package = "forky-udpflow" }
+clap = { version = "4.3.1", features = ["default", "derive", "cargo"] }
+daemonize = "0.5.0"
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"
+opool = "0.1"
+cfg-if = "1.0"
+tokio = { version = "1", features = ["full"] }
+futures = "0.3.28"
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+jemallocator = { version = "0.5", optional = true }
+
+[features]
+default = []
+alloc-jem = ["jemallocator"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+incremental = false
+panic = "unwind"
+strip = true
