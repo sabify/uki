@@ -1,0 +1,33 @@
+name: Rust
+
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Run lint
+        run: cargo clippy --verbose --all-targets --all-features
+      - name: Build
+        run: cargo build --verbose
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Run lint
+        run: cargo clippy --verbose --verbose --all-targets --all-features
+      - name: Build
+        run: cargo build --verbose
