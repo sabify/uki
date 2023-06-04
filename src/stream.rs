@@ -10,15 +10,22 @@ pub enum Mode {
     Encrypt,
     Decrypt,
 }
-pub struct EncryptStream<T> {
+pub struct EncryptStream<T, U>
+where
+    U: Encryption + Unpin,
+{
     socket: T,
-    encryption: Arc<Encryption>,
+    encryption: Arc<U>,
     mode: Mode,
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin> EncryptStream<T> {
+impl<T, U> EncryptStream<T, U>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+    U: Encryption + Unpin,
+{
     #[inline]
-    pub fn new(socket: T, encryption: Arc<Encryption>, mode: Mode) -> Self {
+    pub fn new(socket: T, encryption: Arc<U>, mode: Mode) -> Self {
         Self {
             socket,
             encryption,
@@ -27,7 +34,11 @@ impl<T: AsyncRead + AsyncWrite + Unpin> EncryptStream<T> {
     }
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin> AsyncRead for EncryptStream<T> {
+impl<T, U> AsyncRead for EncryptStream<T, U>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+    U: Encryption + Unpin,
+{
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -44,15 +55,19 @@ impl<T: AsyncRead + AsyncWrite + Unpin> AsyncRead for EncryptStream<T> {
         }
 
         match this.mode {
-            Mode::Encrypt => this.encryption.encrypt(buf.filled_mut()),
-            Mode::Decrypt => this.encryption.decrypt(buf.filled_mut()),
+            Mode::Encrypt => this.encryption.encrypt(buf),
+            Mode::Decrypt => this.encryption.decrypt(buf),
         }
 
         Poll::Ready(Ok(()))
     }
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin> AsyncWrite for EncryptStream<T> {
+impl<T, U> AsyncWrite for EncryptStream<T, U>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+    U: Encryption + Unpin,
+{
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize>> {
         let this = self.get_mut();
         Pin::new(&mut this.socket).poll_write(cx, buf)

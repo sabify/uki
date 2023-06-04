@@ -1,11 +1,12 @@
-use crate::cipher::Encryption;
+use crate::cipher::Cipher;
 use clap::{Parser, Subcommand};
+use std::sync::Arc;
 use std::{net::SocketAddr, path::PathBuf};
 use tracing::Level;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
-pub struct Cli {
+pub struct Args {
     #[arg(required = true, long, short)]
     /// Listen address. e.g. '0.0.0.0:8080' or '[::]:8080' for dual stack listen.
     pub listen: SocketAddr,
@@ -18,11 +19,11 @@ pub struct Cli {
     #[arg(long, default_value_t = 20)]
     /// Connections that fail or are idle for `timeout` seconds will be closed.
     pub timeout: u64,
-    #[arg(long)]
+    #[arg(long, value_parser = parse_encryption)]
     /// Enable encryption. Usage format: '<method>:<arg>', e.g. 'xor:mysecurekey'.
     /// This should be enabled on both server and client.
     /// Currently only XOR is supported.
-    pub encryption: Option<Encryption>,
+    pub encryption: Option<Arc<Cipher>>,
     #[arg(long)]
     /// Run the app as a daemon.
     pub daemonize: bool,
@@ -43,4 +44,8 @@ pub struct Cli {
 pub enum Commands {
     Client,
     Server,
+}
+
+fn parse_encryption(value: &str) -> Result<Arc<Cipher>, String> {
+    Cipher::try_from(value).map(Arc::new)
 }

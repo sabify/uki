@@ -1,46 +1,41 @@
-#[derive(Debug, Clone)]
-pub enum Encryption {
+use tokio::io::ReadBuf;
+
+pub trait Encryption {
+    fn encrypt(&self, buf: &mut ReadBuf);
+    fn decrypt(&self, buf: &mut ReadBuf);
+}
+
+#[derive(Debug)]
+pub enum Cipher {
     Xor(Vec<u8>),
 }
 
-impl From<String> for Encryption {
-    fn from(input: String) -> Self {
-        Self::from(input.as_str())
-    }
-}
+impl TryFrom<&str> for Cipher {
+    type Error = String;
 
-impl From<&String> for Encryption {
-    fn from(input: &String) -> Self {
-        Self::from(input.as_str())
-    }
-}
-
-impl From<&str> for Encryption {
-    fn from(input: &str) -> Self {
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
         let input = input.to_lowercase();
         let input: Vec<&str> = input.splitn(2, ':').collect();
         match input[0] {
             "xor" => {
-                if input.len() < 2 {
-                    panic!("xor key should be provided");
+                if input[1].is_empty() {
+                    Err("xor key should be provided. format: 'xor:<key>'".into())
                 } else {
-                    Self::Xor(input[1].into())
+                    Ok(Self::Xor(input[1].into()))
                 }
             }
-            _ => {
-                panic!("{} encryption is not supported.", input[0]);
-            }
+            _ => Err(format!("{} encryption is not supported.", input[0])),
         }
     }
 }
 
-impl Encryption {
+impl Encryption for Cipher {
     #[inline]
-    pub fn encrypt(&self, input: &mut [u8]) {
+    fn encrypt(&self, input: &mut ReadBuf) {
         match self {
             Self::Xor(ref key) => {
                 let mut key = key.iter().cycle();
-                input.iter_mut().for_each(|x| {
+                input.filled_mut().iter_mut().for_each(|x| {
                     *x ^= match key.next() {
                         Some(key) => key,
                         None => unreachable!(),
@@ -51,7 +46,7 @@ impl Encryption {
     }
 
     #[inline]
-    pub fn decrypt(&self, input: &mut [u8]) {
+    fn decrypt(&self, input: &mut ReadBuf) {
         match self {
             Self::Xor(_) => {
                 self.encrypt(input);
