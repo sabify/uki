@@ -1,6 +1,6 @@
 use tokio::io::ReadBuf;
 
-pub trait Encryption {
+pub trait Encryptor {
     fn encrypt(&self, buf: &mut ReadBuf);
     fn decrypt(&self, buf: &mut ReadBuf);
 }
@@ -29,7 +29,7 @@ impl TryFrom<&str> for Cipher {
     }
 }
 
-impl Encryption for Cipher {
+impl Encryptor for Cipher {
     #[inline]
     fn encrypt(&self, input: &mut ReadBuf) {
         match self {

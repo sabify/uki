@@ -1,4 +1,4 @@
-use crate::cipher::Encryption;
+use crate::cipher::Encryptor;
 use futures::ready;
 use std::io::Result;
 use std::pin::Pin;
@@ -12,9 +12,9 @@ pub enum Mode {
 }
 pub struct EncryptStream<T, U>
 where
-    U: Encryption + Unpin,
+    U: Encryptor + Unpin,
 {
-    socket: T,
+    io: T,
     encryption: Arc<U>,
     mode: Mode,
 }
@@ -22,12 +22,12 @@ where
 impl<T, U> EncryptStream<T, U>
 where
     T: AsyncRead + AsyncWrite + Unpin,
-    U: Encryption + Unpin,
+    U: Encryptor + Unpin,
 {
     #[inline]
-    pub fn new(socket: T, encryption: Arc<U>, mode: Mode) -> Self {
+    pub fn new(io: T, encryption: Arc<U>, mode: Mode) -> Self {
         Self {
-            socket,
+            io,
             encryption,
             mode,
         }
@@ -37,7 +37,7 @@ where
 impl<T, U> AsyncRead for EncryptStream<T, U>
 where
     T: AsyncRead + AsyncWrite + Unpin,
-    U: Encryption + Unpin,
+    U: Encryptor + Unpin,
 {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -46,7 +46,7 @@ where
     ) -> Poll<Result<()>> {
         let this = self.get_mut();
 
-        let result = ready!(Pin::new(&mut this.socket).poll_read(cx, buf));
+        let result = ready!(Pin::new(&mut this.io).poll_read(cx, buf));
 
         match result {
             Ok(_) => {}
@@ -66,11 +66,11 @@ where
 impl<T, U> AsyncWrite for EncryptStream<T, U>
 where
     T: AsyncRead + AsyncWrite + Unpin,
-    U: Encryption + Unpin,
+    U: Encryptor + Unpin,
 {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize>> {
         let this = self.get_mut();
-        Pin::new(&mut this.socket).poll_write(cx, buf)
+        Pin::new(&mut this.io).poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<()>> {

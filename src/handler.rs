@@ -1,5 +1,5 @@
 use crate::args::{Args, Commands};
-use crate::stream::EncryptStream;
+use crate::encrypt_stream::EncryptStream;
 use opool::PoolAllocator;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -226,12 +226,15 @@ async fn encrypt<T, U>(
     U: AsyncRead + AsyncWrite + Unpin,
 {
     if let Some(encryption) = &args.encryption {
-        let peer_sock =
-            EncryptStream::new(peer_sock, encryption.clone(), crate::stream::Mode::Encrypt);
+        let peer_sock = EncryptStream::new(
+            peer_sock,
+            encryption.clone(),
+            crate::encrypt_stream::Mode::Encrypt,
+        );
         let remote_sock = EncryptStream::new(
             remote_sock,
             encryption.clone(),
-            crate::stream::Mode::Decrypt,
+            crate::encrypt_stream::Mode::Decrypt,
         );
         relay(peer_addr, peer_sock, remote_sock, args, pool).await;
         return;
