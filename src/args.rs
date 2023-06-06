@@ -13,6 +13,9 @@ pub struct Args {
     #[arg(required = true, long, short)]
     /// Remote address. Both IPv4 and IPv6 is supported.
     pub remote: SocketAddr,
+    #[arg(long, value_parser = ["udp", "tcp", "uot"])]
+    /// Protocol of choice. currently tcp, tcp and uot (udp over tcp) is supported.
+    pub protocol: String,
     #[arg(long)]
     /// Enable deadline on open connections. An open connection will be forcibly closed after provided seconds.
     pub deadline: Option<u64>,
