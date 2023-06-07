@@ -1,6 +1,6 @@
 # Uki
 
-Uki (pronounced `ookee`) is a fast, simple and cross-platform UDP packet forwarder and encryptor. It allows you to forward UDP packets between two or more hosts, and encrypts the packets to protect your data from prying eyes (you read "firewalls"!). Uki is easy to use, and can be configured with a simple command line interface.
+Uki (pronounced `ookee`) is a fast, simple and cross-platform packet forwarder and encryptor. It allows you to forward UDP and TCP packets between two or more hosts, and encrypts the packets to protect your data from prying eyes (you read "firewalls"!). Uki is easy to use, and can be configured with a simple command line interface.
 
 Here are some of the features of Uki:
 
@@ -11,18 +11,28 @@ Here are some of the features of Uki:
 
 # Usage
 
-IPs, ports and domains are just for example. Both IPv4 and IPv6 are supported.
+IPs and ports are just for illustration. Both IPv4 and IPv6 are supported.
 For globally listen on IPv4, use `0.0.0.0`, and for IPv6, use `[::]`.
 
 Here's an example configuration:
 
 ```text
-UDP traffic <==> Uki Client <==> <Uki UDP traffic> <==> Uki Server <==> UDP traffic
-                      |                                          |
-                      |                                          |
-            listen: 127.0.0.1:1111                     listen: 127.0.0.1:2222
-            remote: 127.0.0.1:2222                     remote: 127.0.0.1:3333
+Client Traffic <==> Uki Client <==> <Uki Traffic> <==> Uki Server <==> Remote Traffic
+                      |                                     |
+                      |                                     |
+            listen: 127.0.0.1:1111                listen: 127.0.0.1:2222
+            remote: 127.0.0.1:2222                remote: 127.0.0.1:3333
 ```
+
+# Supported Protocols
+
+- UDP
+- TCP
+- UDP over TCP
+
+# Supported Encryptions
+
+- Xor
 
 # Installation
 
@@ -35,9 +45,7 @@ Please consult `uki --help`
 # TODO
 
 - More encryption methods
-- Handshakes
-- TCP packet forwarder
-- UDP over TCP
+- More transports/protocols
 
 Contributions are so welcome.
 

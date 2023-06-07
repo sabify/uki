@@ -1,15 +1,15 @@
 [package]
 name = "uki"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 authors = ["Saber Haj Rabiee"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/sabify/uki"
-keywords = ["encryption", "udp", "network", "forward", "tunnel"]
+keywords = ["encryption", "udp", "tcp", "udp over tcp", "tunnel"]
 categories = ["network-programming"]
 readme = "README.md"
 description = """
-Uki is a fast, simple and cross-platform UDP packet forwarder and encryptor.
+Uki is a fast, simple and cross-platform UDP and TCP packet forwarder and encryptor.
 """
 
 [dependencies]
