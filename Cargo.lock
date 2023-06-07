@@ -181,9 +181,9 @@ dependencies = [
 
 [[package]]
 name = "forky-udpflow"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54fcb9f4bef150eded662dcdaf762cc4bc9a06b7938fe2c4adc17a9b23b4af1f"
+checksum = "6edf5c3e2773270b7c7d4c0f396ad5efefd7a5f816cc022de2b87bb7fc521ad6"
 dependencies = [
  "socket2 0.5.3",
  "tokio",
