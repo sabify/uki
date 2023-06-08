@@ -73,6 +73,7 @@ async fn tcp_listen(
     let args = Arc::new(args);
     loop {
         let (peer_sock, peer_addr) = bind_sock.accept().await?;
+        peer_sock.set_nodelay(true)?;
         tokio::spawn(new_peer(
             peer_addr,
             local_bind_ip,
@@ -112,6 +113,10 @@ async fn uot_listen(pool: Arc<PoolAllocator>, args: Args) -> std::io::Result<()>
             let bind_sock = TcpListener::bind(args.listen).await?;
             loop {
                 let (peer_sock, peer_addr) = bind_sock.accept().await?;
+                if let Err(err) = peer_sock.set_nodelay(true) {
+                    tracing::error!("{peer_addr} tcp nodelay set failed: {err}");
+                    continue;
+                }
                 tokio::spawn(new_peer(
                     peer_addr,
                     local_bind_ip,
@@ -143,7 +148,7 @@ async fn new_peer<T>(
         _ => unreachable!(),
     };
     if let Err(err) = result {
-        tracing::error!("error creating port: {err}");
+        tracing::error!("error creating remote socket: {err}");
     };
 }
 
@@ -174,6 +179,7 @@ where
     T: AsyncRead + AsyncWrite + Unpin,
 {
     let remote_sock = TcpStream::connect(args.remote).await?;
+    remote_sock.set_nodelay(true)?;
     encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
     Ok(())
 }
@@ -192,6 +198,7 @@ where
     match args.command {
         Commands::Client => {
             let remote_sock = TcpStream::connect(args.remote).await?;
+            remote_sock.set_nodelay(true)?;
             let remote_sock = udpflow::UotStream::new(remote_sock);
             encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
         }
