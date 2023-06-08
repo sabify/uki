@@ -1,7 +1,7 @@
 use crate::args::{Args, Commands};
 use crate::encrypt_stream::EncryptStream;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
 const POOL_SIZE: usize = 1024 * 16;
@@ -31,7 +31,7 @@ pub async fn handle(args: Args) -> std::io::Result<()> {
         "uot" => uot_listen(pool, args).await,
         "tcp" => tcp_listen(pool, args).await,
         "udp" => udp_listen(pool, args).await,
-        other => panic!("{} protocol is not supported.", other),
+        _ => unreachable!(),
     }
 }
 
@@ -278,18 +278,58 @@ async fn relay<T, U>(
         None => std::time::Duration::from_secs(84600 * 365),
     };
 
-    if let Err(err) = tokio::time::timeout(
-        duration,
-        crate::copy_bidirectional::copy_bidirectional(
-            &mut peer_sock,
-            &mut remote_sock,
-            pool.get().as_mut(),
-            pool.get().as_mut(),
-        ),
-    )
-    .await
-    {
-        tracing::error!("peer {peer_addr} connection failed: {err}");
+    let deadline = tokio::time::sleep(duration);
+    tokio::pin!(deadline);
+
+    let mut peer_buf = pool.get();
+    let mut remote_buf = pool.get();
+
+    loop {
+        tokio::select! {
+            result = peer_sock.read(&mut peer_buf) => {
+                let n = match result {
+                    Ok(n) => n,
+                    Err(err) => {
+                        tracing::error!("peer {peer_addr} read failed: {err}");
+                        return;
+                    }
+                };
+
+                if n == 0 {
+                    // EOF
+                    tracing::error!("peer {peer_addr} read received EOF");
+                    return;
+                }
+
+                if let Err(err) = remote_sock.write_all(&peer_buf[..n]).await {
+                    tracing::error!("peer {peer_addr} write remote error: {err}");
+                    return;
+                }
+            }
+            result = remote_sock.read(&mut remote_buf) => {
+                let n = match result {
+                    Ok(n) => n,
+                    Err(err) => {
+                        tracing::error!("peer {peer_addr} remote read failed: {err}");
+                        return;
+                    }
+                };
+
+                if n == 0 {
+                    // EOF
+                    tracing::error!("peer {peer_addr} read remote received EOF");
+                    return;
+                }
+
+                if let Err(err) = peer_sock.write_all(&remote_buf[..n]).await {
+                    tracing::error!("peer {peer_addr} write remote error: {err}");
+                    return;
+                }
+            }
+            _ = &mut deadline => {
+                tracing::error!("peer {peer_addr} reached deadline");
+                return;
+            }
+        }
     }
-    tracing::info!("peer {peer_addr} disconnected");
 }
