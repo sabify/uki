@@ -21,6 +21,7 @@ pub struct Args {
     pub deadline: Option<u64>,
     #[arg(long, default_value_t = 20)]
     /// Connections that fail or are idle for `timeout` seconds will be closed.
+    /// (udp related protocols only)
     pub timeout: u64,
     #[arg(long, value_parser = parse_encryption)]
     /// Enable encryption. Usage format: '<method>:<arg>', e.g. 'xor:mysecurekey'.
