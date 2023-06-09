@@ -28,6 +28,11 @@ pub struct Args {
     /// This should be enabled on both server and client.
     /// Currently only XOR is supported.
     pub encryption: Option<Arc<Cipher>>,
+    #[arg(long, value_parser = parse_handshake)]
+    /// Enable sending custom handshake data. Format: '<request-file-path>,<response-file-path>'.
+    /// When enabled, it should be enabled on both server and client with the same request and response
+    /// file.
+    pub custom_handshake: Option<Arc<CustomHandshake>>,
     #[arg(long)]
     /// Run the app as a daemon.
     pub daemonize: bool,
@@ -50,6 +55,27 @@ pub enum Commands {
     Server,
 }
 
+#[derive(Debug)]
+pub struct CustomHandshake {
+    pub request: Box<[u8]>,
+    pub response: Box<[u8]>,
+}
+
 fn parse_encryption(value: &str) -> Result<Arc<Cipher>, String> {
     Cipher::try_from(value).map(Arc::new)
+}
+
+fn parse_handshake(value: &str) -> Result<Arc<CustomHandshake>, String> {
+    let values: Vec<&str> = value.split(',').collect();
+    if values.len() < 2 {
+        return Err("you should provide both request and response file paths".into());
+    }
+    let request = std::fs::read(values[0])
+        .map_err(|err| format!("{err}"))?
+        .into_boxed_slice();
+    let response = std::fs::read(values[1])
+        .map_err(|err| format!("{err}"))?
+        .into_boxed_slice();
+
+    Ok(Arc::new(CustomHandshake { request, response }))
 }

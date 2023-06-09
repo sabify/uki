@@ -156,14 +156,15 @@ async fn new_peer_udp<T>(
     peer_addr: SocketAddr,
     local_bind_ip: SocketAddr,
     args: Arc<Args>,
-    peer_sock: T,
+    mut peer_sock: T,
     pool: Arc<PoolAllocator>,
     buf: Option<(PoolAllocatorObject, usize)>,
 ) -> std::io::Result<()>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
-    let remote_sock = udpflow::UdpStreamRemote::new(local_bind_ip, args.remote).await?;
+    let mut remote_sock = udpflow::UdpStreamRemote::new(local_bind_ip, args.remote).await?;
+    handshake(&mut peer_sock, &mut remote_sock, &args).await?;
     encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
     Ok(())
 }
@@ -171,15 +172,16 @@ where
 async fn new_peer_tcp<T>(
     peer_addr: SocketAddr,
     args: Arc<Args>,
-    peer_sock: T,
+    mut peer_sock: T,
     pool: Arc<PoolAllocator>,
     buf: Option<(PoolAllocatorObject, usize)>,
 ) -> std::io::Result<()>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
-    let remote_sock = TcpStream::connect(args.remote).await?;
+    let mut remote_sock = TcpStream::connect(args.remote).await?;
     remote_sock.set_nodelay(true)?;
+    handshake(&mut peer_sock, &mut remote_sock, &args).await?;
     encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
     Ok(())
 }
@@ -188,7 +190,7 @@ async fn new_peer_uot<T>(
     peer_addr: SocketAddr,
     local_bind_ip: SocketAddr,
     args: Arc<Args>,
-    peer_sock: T,
+    mut peer_sock: T,
     pool: Arc<PoolAllocator>,
     buf: Option<(PoolAllocatorObject, usize)>,
 ) -> std::io::Result<()>
@@ -197,17 +199,44 @@ where
 {
     match args.command {
         Commands::Client => {
-            let remote_sock = TcpStream::connect(args.remote).await?;
+            let mut remote_sock = TcpStream::connect(args.remote).await?;
             remote_sock.set_nodelay(true)?;
+            handshake(&mut peer_sock, &mut remote_sock, &args).await?;
             let remote_sock = udpflow::UotStream::new(remote_sock);
             encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
         }
         Commands::Server => {
+            let mut remote_sock = udpflow::UdpStreamRemote::new(local_bind_ip, args.remote).await?;
+            handshake(&mut peer_sock, &mut remote_sock, &args).await?;
             let peer_sock = udpflow::UotStream::new(peer_sock);
-            let remote_sock = udpflow::UdpStreamRemote::new(local_bind_ip, args.remote).await?;
             encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
         }
     }
+    Ok(())
+}
+
+async fn handshake<T, U>(peer_sock: &mut T, remote_sock: &mut U, args: &Args) -> std::io::Result<()>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+    U: AsyncRead + AsyncWrite + Unpin,
+{
+    if let Some(custom_handshake) = args.custom_handshake.clone() {
+        match args.command {
+            Commands::Client => {
+                remote_sock.write_all(&custom_handshake.request).await?;
+                remote_sock
+                    .read_exact(vec![0u8; custom_handshake.response.len()].as_mut())
+                    .await?;
+            }
+            Commands::Server => {
+                peer_sock
+                    .read_exact(vec![0u8; custom_handshake.request.len()].as_mut())
+                    .await?;
+                peer_sock.write_all(&custom_handshake.response).await?;
+            }
+        }
+    };
+
     Ok(())
 }
 
