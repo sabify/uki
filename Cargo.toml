@@ -14,7 +14,7 @@ Uki is a fast, simple and cross-platform UDP and TCP packet forwarder and encryp
 
 [dependencies]
 udpflow = { version = "0.2", package = "forky-udpflow" }
-clap = { version = "4.3.10", features = ["default", "derive", "cargo"] }
+clap = { version = "4.3.18", features = ["default", "derive", "cargo"] }
 daemonize = "0.5.0"
 tracing = "0.1.37"
 tracing-subscriber = "0.3.17"
