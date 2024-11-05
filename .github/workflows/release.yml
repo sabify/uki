@@ -48,7 +48,7 @@ jobs:
           zip uki_${{ matrix.target }}.zip uki
 
       - name: Upload Github Assets
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: target/${{ matrix.target }}/release/*.zip
           prerelease: ${{ contains(github.ref, '-') }}
@@ -80,7 +80,7 @@ jobs:
           zip uki_${{ matrix.target }}.zip uki
 
       - name: Upload Github Assets
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: target/${{ matrix.target }}/release/*.zip
           prerelease: ${{ contains(github.ref, '-') }}
