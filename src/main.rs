@@ -7,6 +7,10 @@ cfg_if! {
         use jemallocator::Jemalloc;
         #[global_allocator]
         static GLOBAL: Jemalloc = Jemalloc;
+    } else if #[cfg(feature = "alloc-mim")] {
+        use mimalloc::MiMalloc;
+        #[global_allocator]
+        static GLOBAL: MiMalloc = MiMalloc;
     }
 }
 

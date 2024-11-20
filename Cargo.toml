@@ -14,14 +14,15 @@ Uki is a fast, simple and cross-platform UDP and TCP packet forwarder and encryp
 
 [dependencies]
 udpflow = { version = "0.2", package = "forky-udpflow" }
-clap = { version = "4.3.10", features = ["default", "derive", "cargo"] }
+clap = { version = "4.4.10", features = ["default", "derive", "cargo"] }
 daemonize = "0.5.0"
-tracing = "0.1.37"
-tracing-subscriber = "0.3.17"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
 opool = "0.1"
 cfg-if = "1.0"
 tokio = { version = "1", features = ["full"] }
-futures = "0.3.28"
+futures = "0.3.29"
+mimalloc = { version = "0.1", optional = true, default-features = false }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 jemallocator = { version = "0.5", optional = true }
@@ -29,6 +30,7 @@ jemallocator = { version = "0.5", optional = true }
 [features]
 default = []
 alloc-jem = ["jemallocator"]
+alloc-mim = ["mimalloc"]
 
 [profile.release]
 lto = true
