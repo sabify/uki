@@ -1,6 +1,6 @@
 use crate::{
     args::{Args, Commands},
-    encrypt_stream::EncryptStream,
+    cipher::Encryptor,
 };
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
@@ -160,7 +160,7 @@ where
 
     let mut remote_sock = udpflow::UdpStreamRemote::new(local_bind_ip, args.remote).await?;
     handshake(&mut peer_sock, &mut remote_sock, &args).await?;
-    encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
+    relay(peer_addr, peer_sock, remote_sock, args, pool, buf).await;
     Ok(())
 }
 
@@ -177,7 +177,7 @@ where
     let mut remote_sock = TcpStream::connect(args.remote).await?;
     remote_sock.set_nodelay(true)?;
     handshake(&mut peer_sock, &mut remote_sock, &args).await?;
-    encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
+    relay(peer_addr, peer_sock, remote_sock, args, pool, buf).await;
     Ok(())
 }
 
@@ -202,13 +202,13 @@ where
             remote_sock.set_nodelay(true)?;
             handshake(&mut peer_sock, &mut remote_sock, &args).await?;
             let remote_sock = udpflow::UotStream::new(remote_sock);
-            encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
+            relay(peer_addr, peer_sock, remote_sock, args, pool, buf).await;
         }
         Commands::Server => {
             let mut remote_sock = udpflow::UdpStreamRemote::new(local_bind_ip, args.remote).await?;
             handshake(&mut peer_sock, &mut remote_sock, &args).await?;
             let peer_sock = udpflow::UotStream::new(peer_sock);
-            encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
+            relay(peer_addr, peer_sock, remote_sock, args, pool, buf).await;
         }
     }
     Ok(())
@@ -239,51 +239,6 @@ where
     Ok(())
 }
 
-async fn encrypt<T, U>(
-    peer_addr: SocketAddr,
-    args: Arc<Args>,
-    peer_sock: T,
-    remote_sock: U,
-    pool: Arc<PoolAllocator>,
-    buf: Option<(PoolAllocatorObject, usize)>,
-) where
-    T: AsyncRead + AsyncWrite + Unpin,
-    U: AsyncRead + AsyncWrite + Unpin,
-{
-    if let Some(encryption) = &args.encryption {
-        match args.command {
-            Commands::Client => {
-                let peer_sock = EncryptStream::new(
-                    peer_sock,
-                    encryption.clone(),
-                    crate::encrypt_stream::Mode::Encrypt,
-                );
-                let remote_sock = EncryptStream::new(
-                    remote_sock,
-                    encryption.clone(),
-                    crate::encrypt_stream::Mode::Decrypt,
-                );
-                relay(peer_addr, peer_sock, remote_sock, args, pool, buf).await;
-            }
-            Commands::Server => {
-                let peer_sock = EncryptStream::new(
-                    peer_sock,
-                    encryption.clone(),
-                    crate::encrypt_stream::Mode::Decrypt,
-                );
-                let remote_sock = EncryptStream::new(
-                    remote_sock,
-                    encryption.clone(),
-                    crate::encrypt_stream::Mode::Encrypt,
-                );
-                relay(peer_addr, peer_sock, remote_sock, args, pool, buf).await;
-            }
-        }
-        return;
-    }
-    relay(peer_addr, peer_sock, remote_sock, args, pool, buf).await;
-}
-
 async fn relay<T, U>(
     peer_addr: SocketAddr,
     mut peer_sock: T,
@@ -296,7 +251,18 @@ async fn relay<T, U>(
     U: AsyncRead + AsyncWrite + Unpin,
 {
     if let Some(buf) = buf {
-        if let Err(err) = remote_sock.write_all(&buf.0.as_ref()[..buf.1]).await {
+        let mut encryption_buf = pool.get();
+        encryption_buf[..buf.1].copy_from_slice(&buf.0.as_ref()[..buf.1]);
+        match args.command {
+            Commands::Client => {
+                args.encryption.encrypt(&mut encryption_buf[..buf.1]);
+            }
+            Commands::Server => {
+                args.encryption.decrypt(&mut encryption_buf[..buf.1]);
+            }
+        }
+        let result = remote_sock.write_all(&encryption_buf[..buf.1]).await;
+        if let Err(err) = result {
             tracing::error!("peer {peer_addr} failed sending first packet to remote: {err}");
             return;
         }
@@ -329,6 +295,11 @@ async fn relay<T, U>(
                     return;
                 }
 
+                match args.command {
+                    Commands::Client => args.encryption.encrypt(&mut peer_buf[..n]),
+                    Commands::Server => args.encryption.decrypt(&mut peer_buf[..n]),
+                }
+
                 if let Err(err) = remote_sock.write_all(&peer_buf[..n]).await {
                     tracing::error!("peer {peer_addr} write remote error: {err}");
                     return;
@@ -347,6 +318,11 @@ async fn relay<T, U>(
                     // EOF
                     tracing::error!("peer {peer_addr} read remote received EOF");
                     return;
+                }
+
+                match args.command {
+                    Commands::Client => args.encryption.decrypt(&mut peer_buf[..n]),
+                    Commands::Server => args.encryption.encrypt(&mut peer_buf[..n]),
                 }
 
                 if let Err(err) = peer_sock.write_all(&remote_buf[..n]).await {

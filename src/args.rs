@@ -1,7 +1,6 @@
 use crate::cipher::Cipher;
 use clap::{Parser, Subcommand};
-use std::sync::Arc;
-use std::{net::SocketAddr, path::PathBuf};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tracing::Level;
 
 #[derive(Debug, Parser)]
@@ -23,11 +22,11 @@ pub struct Args {
     /// Connections that fail or are idle for `timeout` seconds will be closed.
     /// (udp related protocols only)
     pub timeout: u64,
-    #[arg(long, value_parser = parse_encryption)]
+    #[arg(long, value_parser = parse_encryption, default_value = "")]
     /// Enable encryption. Usage format: '<method>:<arg>', e.g. 'xor:mysecurekey'.
     /// This should be enabled on both server and client.
     /// Currently only XOR is supported.
-    pub encryption: Option<Arc<Cipher>>,
+    pub encryption: Arc<Cipher>,
     #[arg(long, value_parser = parse_handshake)]
     /// Enable sending custom handshake data. Format: '<request-file-path>,<response-file-path>'.
     /// When enabled, it should be enabled on both server and client with the same request and response
