@@ -1,6 +1,6 @@
 [package]
 name = "uki"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 authors = ["Saber Haj Rabiee"]
 license = "MIT OR Apache-2.0"
