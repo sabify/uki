@@ -1,8 +1,12 @@
-use crate::args::{Args, Commands};
-use crate::encrypt_stream::EncryptStream;
+use crate::{
+    args::{Args, Commands},
+    encrypt_stream::EncryptStream,
+};
 use std::{net::SocketAddr, sync::Arc};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+};
 
 const POOL_SIZE: usize = 1024 * 16;
 
@@ -41,17 +45,13 @@ async fn udp_listen(
 ) -> std::io::Result<()> {
     let bind_sock = udpflow::UdpListener::new(args.listen)?;
 
-    let local_bind_ip: SocketAddr = match args.remote {
-        SocketAddr::V4(_) => "0.0.0.0:0".parse().unwrap(),
-        SocketAddr::V6(_) => "[::]:0".parse().unwrap(),
-    };
     let args = Arc::new(args);
     loop {
         let mut buf = pool.clone().get_rc();
         let (n, peer_sock, peer_addr) = bind_sock.accept(buf.as_mut()).await?;
+        tracing::debug!("accepting new peer: {peer_addr}");
         tokio::spawn(new_peer(
             peer_addr,
-            local_bind_ip,
             args.clone(),
             peer_sock,
             pool.clone(),
@@ -66,17 +66,13 @@ async fn tcp_listen(
 ) -> std::io::Result<()> {
     let bind_sock = TcpListener::bind(args.listen).await?;
 
-    let local_bind_ip: SocketAddr = match args.remote {
-        SocketAddr::V4(_) => "0.0.0.0:0".parse().unwrap(),
-        SocketAddr::V6(_) => "[::]:0".parse().unwrap(),
-    };
     let args = Arc::new(args);
     loop {
         let (peer_sock, peer_addr) = bind_sock.accept().await?;
+        tracing::debug!("accepting new peer: {peer_addr}");
         peer_sock.set_nodelay(true)?;
         tokio::spawn(new_peer(
             peer_addr,
-            local_bind_ip,
             args.clone(),
             peer_sock,
             pool.clone(),
@@ -86,11 +82,6 @@ async fn tcp_listen(
 }
 
 async fn uot_listen(pool: Arc<PoolAllocator>, args: Args) -> std::io::Result<()> {
-    let local_bind_ip: SocketAddr = match args.remote {
-        SocketAddr::V4(_) => "0.0.0.0:0".parse().unwrap(),
-        SocketAddr::V6(_) => "[::]:0".parse().unwrap(),
-    };
-
     let args = Arc::new(args);
 
     match args.command {
@@ -99,9 +90,9 @@ async fn uot_listen(pool: Arc<PoolAllocator>, args: Args) -> std::io::Result<()>
             loop {
                 let mut buf = pool.clone().get_rc();
                 let (n, peer_sock, peer_addr) = bind_sock.accept(buf.as_mut()).await?;
+                tracing::debug!("accepting new peer: {peer_addr}");
                 tokio::spawn(new_peer(
                     peer_addr,
-                    local_bind_ip,
                     args.clone(),
                     peer_sock,
                     pool.clone(),
@@ -117,9 +108,9 @@ async fn uot_listen(pool: Arc<PoolAllocator>, args: Args) -> std::io::Result<()>
                     tracing::error!("{peer_addr} tcp nodelay set failed: {err}");
                     continue;
                 }
+                tracing::debug!("accepting new peer: {peer_addr}");
                 tokio::spawn(new_peer(
                     peer_addr,
-                    local_bind_ip,
                     args.clone(),
                     peer_sock,
                     pool.clone(),
@@ -132,7 +123,6 @@ async fn uot_listen(pool: Arc<PoolAllocator>, args: Args) -> std::io::Result<()>
 
 async fn new_peer<T>(
     peer_addr: SocketAddr,
-    local_bind_ip: SocketAddr,
     args: Arc<Args>,
     peer_sock: T,
     pool: Arc<PoolAllocator>,
@@ -141,10 +131,11 @@ async fn new_peer<T>(
     T: AsyncRead + AsyncWrite + Unpin,
 {
     tracing::info!("new peer: {peer_addr}");
+
     let result = match args.protocol.as_str() {
-        "uot" => new_peer_uot(peer_addr, local_bind_ip, args, peer_sock, pool, buf).await,
+        "uot" => new_peer_uot(peer_addr, args, peer_sock, pool, buf).await,
         "tcp" => new_peer_tcp(peer_addr, args, peer_sock, pool, buf).await,
-        "udp" => new_peer_udp(peer_addr, local_bind_ip, args, peer_sock, pool, buf).await,
+        "udp" => new_peer_udp(peer_addr, args, peer_sock, pool, buf).await,
         _ => unreachable!(),
     };
     if let Err(err) = result {
@@ -154,7 +145,6 @@ async fn new_peer<T>(
 
 async fn new_peer_udp<T>(
     peer_addr: SocketAddr,
-    local_bind_ip: SocketAddr,
     args: Arc<Args>,
     mut peer_sock: T,
     pool: Arc<PoolAllocator>,
@@ -163,6 +153,11 @@ async fn new_peer_udp<T>(
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
+    let local_bind_ip: SocketAddr = match args.remote {
+        SocketAddr::V4(_) => "0.0.0.0:0".parse().unwrap(),
+        SocketAddr::V6(_) => "[::]:0".parse().unwrap(),
+    };
+
     let mut remote_sock = udpflow::UdpStreamRemote::new(local_bind_ip, args.remote).await?;
     handshake(&mut peer_sock, &mut remote_sock, &args).await?;
     encrypt(peer_addr, args, peer_sock, remote_sock, pool, buf).await;
@@ -188,7 +183,6 @@ where
 
 async fn new_peer_uot<T>(
     peer_addr: SocketAddr,
-    local_bind_ip: SocketAddr,
     args: Arc<Args>,
     mut peer_sock: T,
     pool: Arc<PoolAllocator>,
@@ -197,6 +191,11 @@ async fn new_peer_uot<T>(
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
+    let local_bind_ip: SocketAddr = match args.remote {
+        SocketAddr::V4(_) => "0.0.0.0:0".parse().unwrap(),
+        SocketAddr::V6(_) => "[::]:0".parse().unwrap(),
+    };
+
     match args.command {
         Commands::Client => {
             let mut remote_sock = TcpStream::connect(args.remote).await?;
