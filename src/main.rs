@@ -37,7 +37,7 @@ fn main() {
 
         match daemonize.start() {
             Ok(_) => {}
-            Err(e) => panic!("daemonize failed: {}", e),
+            Err(e) => panic!("daemonize failed: {e}"),
         }
     }
 
